@@ -1,0 +1,75 @@
+name: CD Build Push Plan
+
+on:
+  push:
+    branches:
+      - development
+      - staging
+      - main
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set Environment
+        run: |
+          if [ "${GITHUB_REF_NAME}" = "development" ]; then
+            echo "TFVARS=dev.tfvars" >> $GITHUB_ENV
+            echo "ENV=dev" >> $GITHUB_ENV
+          elif [ "${GITHUB_REF_NAME}" = "staging" ]; then
+            echo "TFVARS=staging.tfvars" >> $GITHUB_ENV
+            echo "ENV=staging" >> $GITHUB_ENV
+          elif [ "${GITHUB_REF_NAME}" = "main" ]; then
+            echo "TFVARS=prod.tfvars" >> $GITHUB_ENV
+            echo "ENV=prod" >> $GITHUB_ENV
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker Image
+        run: |
+          docker build -t flask_app -f app/Dockerfile app
+
+      - name: Generate Image URI
+        run: |
+          IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${GITHUB_SHA}
+          echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
+
+      - name: Tag Docker Image
+        run: |
+          docker tag flask_app:latest ${IMAGE_URI}
+
+      - name: Push Docker Image
+        run: |
+          docker push ${IMAGE_URI}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: terraform
+        run: |
+          terraform plan \
+          -var-file=environments/${TFVARS} \
+          -var="app_image=${IMAGE_URI}"
