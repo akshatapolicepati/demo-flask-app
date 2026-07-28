@@ -48,8 +48,9 @@ def summary():
     })
 
 if __name__ == "__main__":
-    # CHANGE 2: Let the cloud environment decide the port
     port = int(os.environ.get("PORT", 5000))
+    # CHANGE 2: Let the cloud environment decide the port
+    
     app.run(
         host="0.0.0.0",
         port=port
