@@ -111,7 +111,7 @@ resource "aws_ecs_service" "vpc-tf" {
   cluster         = aws_ecs_cluster.vpc-tf.id
   task_definition = aws_ecs_task_definition.vpc-tf.arn
 
-  desired_count = 1
+  desired_count = 3
 
   deployment_maximum_percent = 200
 
