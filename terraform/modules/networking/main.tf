@@ -54,6 +54,20 @@ resource "aws_subnet" "public_b" {
   )
 }
 
+resource "aws_subnet" "public_c" {
+  vpc_id                  = aws_vpc.vpc-tf.id
+  cidr_block              = "10.0.3.0/24"
+  availability_zone       = data.aws_availability_zones.available.names[2]
+  map_public_ip_on_launch = true
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.name_prefix}-public-c"
+    }
+  )
+}
+
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.vpc-tf.id
 
@@ -77,5 +91,10 @@ resource "aws_route_table_association" "public_a" {
 
 resource "aws_route_table_association" "public_b" {
   subnet_id      = aws_subnet.public_b.id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "public_c" {
+  subnet_id      = aws_subnet.public_c.id
   route_table_id = aws_route_table.public.id
 }
